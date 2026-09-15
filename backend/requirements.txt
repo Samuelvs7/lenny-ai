@@ -1,5 +1,11 @@
 # --- Web framework ---
 fastapi==0.115.6
+# Pinned explicitly, not left to transitive resolution. Installing the optional
+# Claude Agent SDK pulls `mcp`, which requires starlette>=0.49 — incompatible
+# with this FastAPI, and it fails at import with a confusing
+# "Router.__init__() got an unexpected keyword argument 'on_startup'".
+# See requirements-agent-sdk.txt.
+starlette==0.41.3
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
 pydantic-settings==2.7.0

@@ -46,16 +46,7 @@ RRF_K = 60
 #: string short and stops question scaffolding ("what did guests say about")
 #: from dominating a disjunctive query.
 _QUERY_STOPWORDS = frozenset(
-    """
-    a about all also am an and any are as at be been but by can cant could did
-    do does doing dont for from had has have he her hers him his how i if in
-    into is it its just me more most my no nor not of on once only or other our
-    out over own same she should so some such than that the their them then
-    there these they this those through to too under until up us very was we
-    were what when where which while who whom why will with would you your
-    say says said tell talk talks talked discuss discussed mention mentioned
-    guest guests episode episodes podcast lenny
-    """.split()
+    ["a", "about", "all", "also", "am", "an", "and", "any", "are", "as", "at", "be", "been", "but", "by", "can", "cant", "could", "did", "do", "does", "doing", "dont", "for", "from", "had", "has", "have", "he", "her", "hers", "him", "his", "how", "i", "if", "in", "into", "is", "it", "its", "just", "me", "more", "most", "my", "no", "nor", "not", "of", "on", "once", "only", "or", "other", "our", "out", "over", "own", "same", "she", "should", "so", "some", "such", "than", "that", "the", "their", "them", "then", "there", "these", "they", "this", "those", "through", "to", "too", "under", "until", "up", "us", "very", "was", "we", "were", "what", "when", "where", "which", "while", "who", "whom", "why", "will", "with", "would", "you", "your", "say", "says", "said", "tell", "talk", "talks", "talked", "discuss", "discussed", "mention", "mentioned", "guest", "guests", "episode", "episodes", "podcast", "lenny"]
 )
 
 #: Terms shorter than this rarely disambiguate anything, with an allow-list for

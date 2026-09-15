@@ -165,8 +165,27 @@ async def list_models(state: AppState = Depends(get_state)) -> ModelsResponse:
         active_provider=active,
         active_model=active_model,
         agent_runner=state.settings.agent_runner.value,
+        agent_runner_available=_agent_runner_available(state),
         providers=[ProviderInfo(**entry) for entry in described],
     )
+
+
+def _agent_runner_available(state: AppState) -> bool:
+    """Can the configured agent runner actually run?
+
+    The native runner always can. The Claude Agent SDK runner needs both an
+    optional dependency and an API key, so its availability is reported rather
+    than assumed — a UI that claims a runner is active when it cannot start is
+    worse than one that says nothing.
+    """
+    if state.settings.agent_runner.value != "claude_agent_sdk":
+        return True
+    try:
+        from app.agent.runners.claude_sdk import describe_runner
+
+        return bool(describe_runner(state.settings)["available"])
+    except Exception:
+        return False
 
 
 @router.get("/knowledge-base", response_model=KnowledgeBaseStats, tags=["models"])

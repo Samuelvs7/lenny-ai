@@ -1,0 +1,29 @@
+# Optional: the Anthropic Claude Agent SDK runner (AGENT_RUNNER=claude_agent_sdk).
+#
+# NOT included in requirements.txt on purpose — two reasons:
+#
+#   1. Size. The wheel is ~99 MB because it bundles the Claude Code CLI. The
+#      default local path (AGENT_RUNNER=native, MODEL_PROVIDER=ollama) does not
+#      need any of it.
+#
+#   2. A REAL DEPENDENCY CONFLICT. This SDK depends on `mcp`, which depends on
+#      `sse-starlette>=3.4`, which requires `starlette>=0.49.1`. FastAPI 0.115.6
+#      requires `starlette<0.42`. Installing this into the same environment
+#      upgrades starlette and breaks the API at import:
+#
+#          TypeError: Router.__init__() got an unexpected keyword argument 'on_startup'
+#
+# RECOMMENDED: install into a separate virtualenv used only for the SDK runner.
+#
+#     python -m venv .venv-agent-sdk
+#     .venv-agent-sdk/Scripts/pip install -r requirements-agent-sdk.txt
+#
+# If you install it alongside the API instead, reinstall the pinned starlette
+# afterwards to restore a working API:
+#
+#     pip install starlette==0.41.3
+#
+# The conflict is upstream, not in this project. It is documented rather than
+# hidden because silently shipping a broken import would be worse.
+
+claude-agent-sdk==0.2.152

@@ -16,7 +16,8 @@ evaluator.
 from __future__ import annotations
 
 import time
-from typing import Any, AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Sequence
+from typing import Any
 
 import httpx
 

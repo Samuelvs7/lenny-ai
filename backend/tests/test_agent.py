@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC
+
 import pytest
 
 from app.agent.query import build_retrieval_query, is_follow_up
@@ -301,7 +303,7 @@ class TestFollowUpQueryRewriting:
     """
 
     def _history(self, *questions: str) -> list[Message]:
-        from datetime import datetime, timezone
+        from datetime import datetime
         from uuid import uuid4
 
         return [
@@ -310,7 +312,7 @@ class TestFollowUpQueryRewriting:
                 session_id=uuid4(),
                 role=MessageRole.USER,
                 content=question,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
             for question in questions
         ]

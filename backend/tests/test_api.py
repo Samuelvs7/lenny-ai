@@ -15,7 +15,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 
-from tests.conftest import FailingLLM, FakeLLM, TEST_DATABASE_URL, requires_db
+from tests.conftest import TEST_DATABASE_URL, FailingLLM, FakeLLM, requires_db
 
 pytestmark = requires_db
 
@@ -314,8 +314,8 @@ class TestPersistenceAndIsolation:
         await app_client.post(f"/api/sessions/{session_id}/chat", json={"message": "hello there"})
         await app_client.delete(f"/api/sessions/{session_id}")
 
-        from app.db.engine import get_engine
         from app.config import get_settings
+        from app.db.engine import get_engine
 
         async with get_engine(get_settings()).connect() as conn:
             remaining = (

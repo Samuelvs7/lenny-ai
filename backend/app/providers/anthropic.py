@@ -20,7 +20,8 @@ explicitly below:
 from __future__ import annotations
 
 import time
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from app.errors import (
     ProviderResponseError,
@@ -95,7 +96,7 @@ class AnthropicProvider(LLMProvider):
         messages: Sequence[ChatMessage],
         *,
         max_tokens: int = 1024,
-        temperature: float = 0.2,  # noqa: ARG002 - see module docstring
+        temperature: float = 0.2,
         stop: Sequence[str] | None = None,
     ) -> LLMResponse:
         system_prompt, turns = _split_system(messages)

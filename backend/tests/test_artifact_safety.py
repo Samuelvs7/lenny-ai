@@ -13,11 +13,11 @@ import pytest
 from app.skills.artifact_safety import (
     ARTIFACT_CSP,
     MAX_ARTIFACT_CHARS,
+    SafetyReport,
     extract_title,
     sanitise_css,
     sanitise_html_artifact,
     sanitise_markdown_artifact,
-    SafetyReport,
 )
 
 

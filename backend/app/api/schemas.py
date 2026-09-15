@@ -136,6 +136,8 @@ class ModelsResponse(BaseModel):
     active_provider: str
     active_model: str | None = None
     agent_runner: str
+    #: False when the configured runner cannot start (missing SDK or API key).
+    agent_runner_available: bool = True
     providers: list[ProviderInfo]
 
 

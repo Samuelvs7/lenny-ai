@@ -114,6 +114,7 @@ export interface ModelsResponse {
   active_provider: string;
   active_model: string | null;
   agent_runner: string;
+  agent_runner_available?: boolean;
   providers: ProviderInfo[];
 }
 

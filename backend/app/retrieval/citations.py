@@ -171,7 +171,7 @@ def format_context(chunks: list[RetrievedChunk], citations: list[Citation]) -> s
       corpus, must not be executed as a directive. See ``docs/security.md``.
     """
     lines: list[str] = []
-    for chunk, citation in zip(chunks, citations):
+    for chunk, citation in zip(chunks, citations, strict=True):
         speaker = chunk.speaker or "Unknown speaker"
         stamp = ""
         if chunk.start_seconds is not None:

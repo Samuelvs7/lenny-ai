@@ -17,8 +17,8 @@ local is the supported default.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from app.config import ProviderName, Settings
 from app.errors import ProviderError, ProviderUnavailableError

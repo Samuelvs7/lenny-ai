@@ -237,8 +237,8 @@ class Ship30EssaySkill(Skill):
             )
             try:
                 revised_response = await context.provider.generate(
-                    messages
-                    + [
+                    [
+                        *messages,
                         ChatMessage(role=Role.ASSISTANT, content=essay),
                         ChatMessage(role=Role.USER, content=revision_request),
                     ],

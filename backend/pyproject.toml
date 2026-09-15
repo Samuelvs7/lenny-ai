@@ -1,0 +1,40 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "W",    # warnings
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    # `Depends(...)` in an argument default is *the* FastAPI idiom. Flagging it
+    # would mean rewriting every route handler against the framework's grain.
+    "B008",
+    # Long lines inside docstrings and SQL are intentional; line-length above
+    # still governs code.
+    "E501",
+    # `class X(str, Enum)` rather than StrEnum: pydantic v2 serialises the
+    # former predictably in JSON responses, and it is the shape the API
+    # contracts are built on.
+    "UP042",
+    # Curly apostrophes appear inside regexes that must match real transcript
+    # text, where they occur constantly.
+    "RUF001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests deliberately reach into private state to construct index fixtures, and
+# assert-heavy style is the point.
+"tests/*" = ["SLF001", "S101", "RUF100", "SIM117"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]

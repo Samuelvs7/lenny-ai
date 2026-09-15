@@ -72,10 +72,9 @@ def is_follow_up(question: str) -> bool:
         return True
 
     words = text.split()
-    if len(words) <= _SHORT_QUESTION_WORDS and _DANGLING_REFERENCE.search(text):
-        return True
-
-    return False
+    return bool(
+        len(words) <= _SHORT_QUESTION_WORDS and _DANGLING_REFERENCE.search(text)
+    )
 
 
 def _topic_terms(text: str, limit: int = 12) -> list[str]:

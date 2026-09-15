@@ -17,9 +17,10 @@ free. Forcing one provider to do both would make that impossible.
 from __future__ import annotations
 
 import abc
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import AsyncIterator, Protocol, Sequence, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 class Role(str, Enum):

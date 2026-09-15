@@ -9,7 +9,8 @@ path uniform and prevents connection strings leaking into error responses.
 from __future__ import annotations
 
 import json
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text

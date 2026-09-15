@@ -17,9 +17,9 @@ Operational properties that matter for handoff:
 from __future__ import annotations
 
 import struct
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence
 from uuid import UUID
 
 from sqlalchemy import text
@@ -243,7 +243,7 @@ class IngestionPipeline:
             )
 
             payload = []
-            for chunk, vector in zip(chunks, vectors):
+            for chunk, vector in zip(chunks, vectors, strict=True):
                 payload.append(
                     {
                         "episode_id": episode_id,
