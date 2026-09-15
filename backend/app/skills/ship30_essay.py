@@ -270,15 +270,21 @@ class Ship30EssaySkill(Skill):
             failures=quality.failures,
         )
 
+        # Sources returned are the evidence the essay was written from, not
+        # only what the model remembered to mark up -- the same contract as
+        # grounded Q&A. llama3.2 produced a structurally sound essay with zero
+        # inline markers; returning an empty source list there would hide the
+        # transcripts that genuinely backed it. Inline usage stays reported
+        # separately so citation discipline remains measurable.
         return SkillResult(
             content=essay,
-            citations=citation_report.used,
+            citations=citations,
             artifact=ArtifactDraft(kind=ArtifactKind.MARKDOWN, title=title, content=essay),
             metadata={
                 "skill": "ship30_essay",
                 "attempts": attempts,
                 "quality": quality.as_dict(),
-                "citations_used": len(citation_report.used),
+                "citations_used_inline": len(citation_report.used),
                 "citations_fabricated": len(citation_report.fabricated_markers),
             },
         )

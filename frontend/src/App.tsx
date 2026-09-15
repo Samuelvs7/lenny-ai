@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, api } from "./api/client";
 import type {
   Artifact,
+  Citation,
   HealthResponse,
   KnowledgeBaseStats,
   Message,
@@ -18,6 +19,7 @@ import { Sidebar } from "./components/Sidebar";
 import { StatusPanel } from "./components/StatusPanel";
 
 type Theme = "light" | "dark";
+type Panel = "artifact" | "sources";
 
 export function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -36,8 +38,13 @@ export function App() {
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBaseStats | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
 
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panel, setPanel] = useState<Panel>("artifact");
+  const [expanded, setExpanded] = useState(false);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => readStoredTheme());
+  const [shared, setShared] = useState(false);
 
   /** The message text of the last send, so "Try again" can replay it. */
   const lastSent = useRef<string | null>(null);
@@ -92,6 +99,8 @@ export function App() {
       setMessages(detail.messages);
       setArtifacts(detail.artifacts);
       setActiveArtifactId(detail.artifacts[0]?.id ?? null);
+      setPanelOpen(detail.artifacts.length > 0);
+      setPanel(detail.artifacts.length > 0 ? "artifact" : "sources");
     } catch (err) {
       if (err instanceof ApiError) setError(err);
     }
@@ -106,6 +115,7 @@ export function App() {
       setMessages([]);
       setArtifacts([]);
       setActiveArtifactId(null);
+      setPanelOpen(false);
       setDraft("");
       await refreshSessions();
       return session.id;
@@ -124,6 +134,7 @@ export function App() {
           setMessages([]);
           setArtifacts([]);
           setActiveArtifactId(null);
+          setPanelOpen(false);
         }
         await refreshSessions();
       } catch (err) {
@@ -132,6 +143,43 @@ export function App() {
     },
     [activeId, refreshSessions],
   );
+
+  const renameSession = useCallback(async () => {
+    if (!activeId) return;
+    const current = sessions.find((s) => s.id === activeId)?.title ?? "";
+    const next = window.prompt("Rename this conversation", current);
+    if (!next || next.trim() === current) return;
+    try {
+      await api.renameSession(activeId, next.trim());
+      await refreshSessions();
+    } catch (err) {
+      if (err instanceof ApiError) setError(err);
+    }
+  }, [activeId, sessions, refreshSessions]);
+
+  /**
+   * Copy the conversation as Markdown.
+   *
+   * Deliberately a local export rather than a hosted share link: publishing a
+   * conversation would need auth, access control and a public surface, none of
+   * which this build has (see PRD non-goals).
+   */
+  const shareConversation = useCallback(async () => {
+    const lines = messages.map((m) => {
+      const who = m.role === "user" ? "**You**" : "**Lenny-AI**";
+      const cites = (m.citations ?? [])
+        .map((c) => `- [${c.marker}] ${c.guest ?? "Unknown"} — ${c.title}${c.deep_link ? ` (${c.deep_link})` : ""}`)
+        .join("\n");
+      return `${who}\n\n${m.content}${cites ? `\n\nSources:\n${cites}` : ""}`;
+    });
+    try {
+      await navigator.clipboard.writeText(lines.join("\n\n---\n\n"));
+      setShared(true);
+      setTimeout(() => setShared(false), 1800);
+    } catch {
+      // Clipboard blocked — nothing useful to show the user for an optional action.
+    }
+  }, [messages]);
 
   // --- sending -------------------------------------------------------------
 
@@ -181,6 +229,8 @@ export function App() {
         if (response.artifact) {
           setArtifacts((current) => [response.artifact!, ...current]);
           setActiveArtifactId(response.artifact.id);
+          setPanel("artifact");
+          setPanelOpen(true);
         }
         void refreshSessions();
       } catch (err) {
@@ -217,6 +267,15 @@ export function App() {
     [artifacts, activeArtifactId],
   );
 
+  /** Citations from the most recent assistant turn that produced any. */
+  const latestCitations: Citation[] = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = messages[i];
+      if (m.role === "assistant" && (m.citations?.length ?? 0) > 0) return m.citations;
+    }
+    return [];
+  }, [messages]);
+
   const artifactMessageIds = useMemo(
     () =>
       new Set(
@@ -230,18 +289,30 @@ export function App() {
   const openArtifactForMessage = useCallback(
     (messageId: string) => {
       const match = artifacts.find((artifact) => artifact.message_id === messageId);
-      if (match) setActiveArtifactId(match.id);
+      if (match) {
+        setActiveArtifactId(match.id);
+        setPanel("artifact");
+        setPanelOpen(true);
+      }
     },
     [artifacts],
   );
 
+  const viewSources = useCallback(() => {
+    setPanel("sources");
+    setPanelOpen(true);
+  }, []);
+
   const activeTitle =
     sessions.find((session) => session.id === activeId)?.title ?? "New chat";
+
+  const panelVisible = panelOpen && (activeArtifact !== null || latestCitations.length > 0);
 
   return (
     <div
       className="app"
-      data-artifact-open={activeArtifact ? "true" : "false"}
+      data-artifact-open={panelVisible ? "true" : "false"}
+      data-expanded={panelVisible && expanded ? "true" : "false"}
       data-sidebar-open={sidebarOpen ? "true" : "false"}
     >
       <Sidebar
@@ -251,6 +322,7 @@ export function App() {
         busy={busy}
         health={health}
         models={models}
+        knowledgeBase={knowledgeBase}
         onNewChat={() => void newChat()}
         onSelect={(id) => void openSession(id)}
         onDelete={(id) => void deleteSession(id)}
@@ -277,25 +349,36 @@ export function App() {
           >
             ☰
           </button>
-          <div className="topbar__title">{activeTitle}</div>
+          <h1 className="topbar__title">{activeTitle}</h1>
+          {activeId && (
+            <button
+              className="icon-btn icon-btn--quiet"
+              onClick={() => void renameSession()}
+              aria-label="Rename conversation"
+              title="Rename conversation"
+            >
+              <PencilIcon />
+            </button>
+          )}
+          <div className="topbar__spacer" />
           <div className="topbar__actions">
+            {messages.length > 0 && (
+              <button className="text-btn" onClick={() => void shareConversation()}>
+                <ShareIcon />
+                {shared ? "Copied" : "Share"}
+              </button>
+            )}
             <button
               className="icon-btn"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
             >
-              {theme === "dark" ? "☀" : "☾"}
+              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
             </button>
-            {activeArtifact && (
-              <button
-                className="icon-btn"
-                aria-pressed="true"
-                onClick={() => setActiveArtifactId(null)}
-                aria-label="Hide artifact panel"
-              >
-                ▥
-              </button>
-            )}
+            <span className="topbar__avatar" aria-hidden="true">
+              S
+            </span>
           </div>
         </header>
 
@@ -304,22 +387,34 @@ export function App() {
           busy={busy}
           error={error}
           draft={draft}
+          models={models}
           onDraftChange={setDraft}
           onSend={(text) => void send(text)}
           onRetry={retry}
           onOpenArtifact={openArtifactForMessage}
+          onViewSources={viewSources}
           artifactMessageIds={artifactMessageIds}
         />
       </div>
 
-      <ArtifactViewer
-        artifact={activeArtifact}
-        artifacts={artifacts}
-        onSelect={(artifact) => setActiveArtifactId(artifact.id)}
-        onClose={() => setActiveArtifactId(null)}
-        onRegenerate={regenerate}
-        busy={busy}
-      />
+      {panelVisible && (
+        <ArtifactViewer
+          artifact={activeArtifact}
+          artifacts={artifacts}
+          citations={latestCitations}
+          panel={panel}
+          onPanelChange={setPanel}
+          expanded={expanded}
+          onToggleExpand={() => setExpanded((value) => !value)}
+          onSelect={(artifact) => {
+            setActiveArtifactId(artifact.id);
+            setPanel("artifact");
+          }}
+          onClose={() => setPanelOpen(false)}
+          onRegenerate={regenerate}
+          busy={busy}
+        />
+      )}
 
       {statusOpen && (
         <StatusPanel
@@ -342,4 +437,57 @@ function readStoredTheme(): Theme {
     // Storage unavailable — fall through to the system preference.
   }
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+// --- icons ------------------------------------------------------------------
+
+function PencilIcon() {
+  return (
+    <svg className="icon icon--sm" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 20h4l10-10a2.8 2.8 0 1 0-4-4L4 16v4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg className="icon icon--sm" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="18" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="6" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="18" cy="19" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m8.4 10.8 7.2-4.1M8.4 13.2l7.2 4.1" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg className="icon icon--sm" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg className="icon icon--sm" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }

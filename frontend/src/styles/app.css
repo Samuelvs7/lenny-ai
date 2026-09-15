@@ -1178,3 +1178,523 @@ kbd {
     transition: none;
   }
 }
+
+
+/* ==========================================================================
+   UI refinement pass
+   ==========================================================================
+   Adds the brand header, conversation search, session timestamps, sidebar
+   navigation, message actions, richer source chips, panel tabs, and a
+   success-styled sanitisation notice.
+
+   One decision worth calling out: the sanitisation notice is GREEN, not amber.
+   Nothing is broken when it appears -- the protections did exactly their job.
+   Styling a working safety feature as a warning teaches users to distrust it.
+   ========================================================================== */
+
+/* --- icons ---------------------------------------------------------------- */
+
+.icon { width: 16px; height: 16px; flex: none; }
+.icon--sm { width: 14px; height: 14px; }
+.icon--xs { width: 12px; height: 12px; }
+.icon--doc { width: 14px; height: 14px; color: var(--text-tertiary); }
+.icon--chevron { width: 14px; height: 14px; margin-left: auto; color: var(--text-tertiary); }
+
+/* --- sidebar brand -------------------------------------------------------- */
+
+.sidebar { grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
+
+.sidebar__brand { padding: 18px 16px 10px; }
+
+.brandmark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  fill: var(--accent);
+}
+
+.sidebar__brandtext { min-width: 0; }
+
+.sidebar__title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.sidebar__tagline { font-size: 11.5px; }
+
+/* --- conversation search -------------------------------------------------- */
+
+.sidebar__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text-tertiary);
+}
+
+.sidebar__search:focus-within {
+  border-color: var(--accent);
+  color: var(--text-secondary);
+}
+
+.sidebar__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.sidebar__search input::placeholder { color: var(--text-tertiary); }
+.sidebar__search input::-webkit-search-cancel-button { display: none; }
+
+.kbd-hint {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+.sidebar__new {
+  border-radius: var(--radius);
+  font-size: 14px;
+  padding: 10px 14px;
+}
+
+.sidebar__empty {
+  padding: 8px 10px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+}
+
+/* --- session rows --------------------------------------------------------- */
+
+.session {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  padding: 7px 10px;
+}
+
+.session__time {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.session[aria-current="true"] .icon--doc { color: var(--accent-text); }
+
+/* --- sidebar footer ------------------------------------------------------- */
+
+.sidebar__model {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.sidebar__model:hover { border-color: var(--border-strong); }
+.sidebar__model-label { color: var(--text-tertiary); }
+
+.sidebar__model-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__nav { display: grid; gap: 2px; }
+
+.navitem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.navitem:hover { background: var(--bg-hover); color: var(--text-primary); }
+.navitem .icon { color: var(--text-tertiary); }
+
+.navitem__badge {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 650;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border-radius: 20px;
+  padding: 1px 7px;
+}
+
+/* --- topbar --------------------------------------------------------------- */
+
+.topbar {
+  gap: 8px;
+  padding: 12px 20px;
+  /* Clip rather than scroll. Without this the bar's natural width (610px)
+     exceeded its column (558px), the browser scrolled the workspace sideways
+     to reveal a focused control, and the conversation title was dragged
+     behind the sidebar. */
+  overflow: hidden;
+}
+
+.topbar__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* basis 0 so the title is what yields when space is tight -- the actions
+     have no sensible truncated state, the title does (an ellipsis). */
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.topbar__spacer { display: none; }
+
+.topbar__actions { flex: none; }
+
+.icon-btn--quiet {
+  border-color: transparent;
+  background: transparent;
+  width: 28px;
+  height: 28px;
+}
+
+.icon-btn--quiet:hover { border-color: var(--border); }
+
+.topbar__avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  flex: none;
+}
+
+/* --- turns ---------------------------------------------------------------- */
+
+.turn--user {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.turn--assistant {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.avatar svg { width: 17px; height: 17px; }
+.avatar--user { background: var(--bg-active); color: var(--text-secondary); }
+.avatar--brand { background: var(--accent-soft); fill: var(--accent); }
+.avatar--brand svg { width: 16px; height: 16px; }
+
+.bubble { position: relative; padding-bottom: 20px; }
+
+.bubble__time {
+  position: absolute;
+  right: 12px;
+  bottom: 5px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- answer actions ------------------------------------------------------- */
+
+.answer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.iconaction {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-tertiary);
+}
+
+.iconaction:hover { background: var(--bg-hover); color: var(--text-primary); }
+.iconaction svg { width: 15px; height: 15px; }
+
+.textaction {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--text-secondary);
+}
+
+.textaction:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.answer__meta { margin-left: auto; }
+.answer__latency { font-variant-numeric: tabular-nums; }
+
+/* --- sources -------------------------------------------------------------- */
+
+.sources__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+}
+
+.sources__head .icon { color: var(--text-tertiary); }
+
+.sources__viewall {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.sources__viewall:hover { background: var(--accent-soft); }
+
+.source { gap: 5px; padding: 10px 11px; }
+
+.source__foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.source__ext { color: var(--text-tertiary); margin-left: auto; }
+.source:hover .source__ext { color: var(--accent-text); }
+
+/* --- composer ------------------------------------------------------------- */
+
+.composer__box {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px 10px 10px 14px;
+}
+
+.composer__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.composer__model {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-sunken);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.composer__hint { font-size: 11.5px; }
+
+/* --- panel tabs ----------------------------------------------------------- */
+
+.artifact__head { gap: 8px; padding: 10px 14px; }
+
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text-tertiary);
+  border-radius: 6px 6px 0 0;
+  white-space: nowrap;
+}
+
+.tabs button:hover:not(:disabled) { color: var(--text-primary); }
+
+.tabs button[aria-selected="true"] {
+  color: var(--text-primary);
+  font-weight: 650;
+  border-bottom-color: var(--accent);
+}
+
+.tabs button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.artifact__headactions { display: flex; gap: 4px; }
+
+.artifact__body--scroll { display: block; }
+
+.panel__empty {
+  padding: 20px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* --- sanitisation notice (success, not warning) --------------------------- */
+
+.safety {
+  margin: 12px 14px;
+  padding: 11px 13px;
+  border: 1px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--success-soft);
+  gap: 7px;
+}
+
+.safety__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.safety__icon { color: var(--success); width: 16px; height: 16px; }
+
+.safety__title {
+  font-weight: 650;
+  font-size: 12.5px;
+  color: var(--success);
+}
+
+.safety__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.safety__list li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.safety__list .icon--xs { color: var(--success); }
+
+/* --- full source list ----------------------------------------------------- */
+
+.srclist {
+  list-style: none;
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.srclist__item {
+  display: grid;
+  gap: 5px;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+}
+
+.srclist__top { display: flex; align-items: center; gap: 7px; }
+
+.srclist__guest { font-size: 13px; font-weight: 640; }
+
+.srclist__title { font-size: 12px; color: var(--text-secondary); }
+
+.srclist__quote {
+  margin: 4px 0;
+  padding-left: 11px;
+  border-left: 2px solid var(--accent);
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.srclist__foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.srclist__foot a {
+  margin-left: auto;
+  color: var(--accent-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.srclist__foot a:hover { text-decoration: underline; }
+
+/* --- expanded panel ------------------------------------------------------- */
+
+.app[data-expanded="true"] { grid-template-columns: var(--sidebar-w) 0 minmax(0, 1fr); }
+.app[data-expanded="true"] .workspace { display: none; }
+
+@media (max-width: 960px) {
+  .app[data-expanded="true"] { grid-template-columns: minmax(0, 1fr); }
+  .sidebar__search { margin-top: 4px; }
+}

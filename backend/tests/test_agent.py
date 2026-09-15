@@ -369,7 +369,7 @@ class TestFollowUpQueryRewriting:
         assert "hiring" not in rewritten
 
     def _turn(self, role, content, declined=False):
-        from datetime import datetime, timezone
+        from datetime import datetime
         from uuid import uuid4
 
         return Message(
@@ -378,7 +378,7 @@ class TestFollowUpQueryRewriting:
             role=role,
             content=content,
             metadata={"declined": declined} if role is MessageRole.ASSISTANT else {},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
     def test_skips_a_declined_turn_when_choosing_the_topic(self):
