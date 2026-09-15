@@ -130,7 +130,8 @@ class ArtifactGenSkill(Skill):
 
 def _chat_summary(kind: ArtifactKind, title: str, blocked: int) -> str:
     label = "HTML page" if kind is ArtifactKind.HTML else "Markdown document"
-    lines = [f"I've created a {label}: **{title}** — it's open in the Artifact Viewer."]
+    article = "an" if label.startswith(("H","A","E","I","O","U")) else "a"
+    lines = [f"I've created {article} {label}: **{title}** — it's open in the Artifact Viewer."]
     if blocked:
         # Surfaced in chat, not only in logs: a user deserves to know the
         # rendered artifact is not byte-identical to what was generated.

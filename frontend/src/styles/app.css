@@ -172,11 +172,24 @@ button {
 
 /* ---------------------------------------------------------------- layout */
 
+/* `grid-template-rows: minmax(0, 1fr)` is load-bearing, not decorative.
+   Without it the implicit row is `auto`, so a child's intrinsic height wins:
+   the artifact iframe reported 2,796px, stretched the row to 2,946px, and
+   pushed the whole panel off-screen (measured top: -2080px). The paired
+   `min-height: 0` on each column child is the other half of the fix — grid and
+   flex items default to `min-height: auto`, which refuses to shrink below
+   content size and defeats the row constraint. */
 .app {
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
   overflow: hidden;
+}
+
+.app > * {
+  min-height: 0;
+  min-width: 0;
 }
 
 .app[data-artifact-open="true"] {
@@ -187,6 +200,8 @@ button {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg-panel);
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
@@ -825,6 +840,8 @@ kbd {
   grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
   background: var(--bg-panel);
 }
 
@@ -912,7 +929,16 @@ kbd {
 .artifact__body {
   overflow: auto;
   min-height: 0;
+  /* The preview iframe is height:100%, which needs a definite height here
+     rather than one derived from its own content. */
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
   background: var(--bg-panel);
+}
+
+/* When the safety notice is present the body holds two rows, not one. */
+.artifact__body:has(.safety) {
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .artifact__frame {

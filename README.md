@@ -182,10 +182,16 @@ Citation validator ── every [S#] must resolve to a real retrieved passage
 PostgreSQL ── sessions, messages, artifacts, episodes, chunks
 ```
 
-Full detail, including the database schema and every API endpoint:
-[`architecture.md`](architecture.md). Product reasoning: [`PRD.md`](PRD.md).
-UI decisions: [`design.md`](design.md). Security posture and residual risks:
-[`docs/security.md`](docs/security.md).
+| Document | What it covers |
+|---|---|
+| [`architecture.md`](architecture.md) | Schema, endpoints, retrieval, routing, deployment topology, trade-offs |
+| [`PRD.md`](PRD.md) | User, problem, success metrics, assumptions, scope and non-goals, risks |
+| [`design.md`](design.md) | UI principles, information architecture, states, responsive, accessibility |
+| [`docs/security.md`](docs/security.md) | Threat model, artifact isolation, **residual risks** |
+| [`docs/manual-test-plan.md`](docs/manual-test-plan.md) | UI checklist covering what automated tests cannot |
+| [`docs/demo-script.md`](docs/demo-script.md) | Shot-by-shot 2–3 minute demo |
+| [`docs/requirements-audit.md`](docs/requirements-audit.md) | Every requirement → where it lives → **whether it was actually verified** |
+| [`agent-transcripts/`](agent-transcripts/) | How this was built, including the eight bugs found and fixed |
 
 **Three decisions worth knowing up front:**
 
