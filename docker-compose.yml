@@ -1,0 +1,153 @@
+# The Lenny Growth Assistant — full local stack.
+#
+#   docker compose up --build          # start everything
+#   docker compose run --rm ingest     # load the knowledge base (run once)
+#
+# Services:
+#   postgres — conversation store + knowledge base
+#   ollama   — local model runtime (mandatory for the demo)
+#   api      — FastAPI backend
+#   web      — React frontend, served by nginx
+#   ingest   — one-shot ingestion job (profile: tools)
+#
+# The API waits for Postgres to be healthy, then applies migrations itself at
+# startup, so there is no separate migration step to remember.
+
+name: lenny-growth-assistant
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lenny}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lenny}
+      POSTGRES_DB: ${POSTGRES_DB:-lenny}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # Without this the API races the database on a cold `up` and logs a
+      # connection error on first boot.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lenny} -d ${POSTGRES_DB:-lenny}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      # Named volume so pulled models survive `docker compose down`. Re-pulling
+      # a 2 GB model on every restart is a bad first impression.
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # One-shot: pulls the two models the app needs. Runs to completion and exits.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling ${OLLAMA_MODEL:-llama3.2} (chat) and ${OLLAMA_EMBED_MODEL:-nomic-embed-text} (embeddings)…"
+        ollama pull ${OLLAMA_MODEL:-llama3.2}
+        ollama pull ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+        echo "Models ready."
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lenny}:${POSTGRES_PASSWORD:-lenny}@postgres:5432/${POSTGRES_DB:-lenny}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-300}
+      MODEL_PROVIDER: ${MODEL_PROVIDER:-ollama}
+      MODEL_FALLBACK_PROVIDER: ${MODEL_FALLBACK_PROVIDER:-none}
+      # Optional. Absent or empty is fine — the app runs fully local.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5}
+      AGENT_RUNNER: ${AGENT_RUNNER:-native}
+      RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K:-5}
+      RETRIEVAL_MIN_SIMILARITY: ${RETRIEVAL_MIN_SIMILARITY:-0.55}
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Transcript cache, so re-ingestion does not re-download the corpus.
+      - corpus-cache:/app/data/corpus
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked at build time: Vite inlines env vars into the bundle.
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+  # Knowledge-base loader. Not part of `up`; run it explicitly:
+  #   docker compose run --rm ingest
+  #   docker compose run --rm ingest --episodes 8      (faster first demo)
+  #   docker compose run --rm ingest --all             (full 269-episode archive)
+  ingest:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lenny}:${POSTGRES_PASSWORD:-lenny}@postgres:5432/${POSTGRES_DB:-lenny}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      INGEST_MAX_EPISODES: ${INGEST_MAX_EPISODES:-30}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+    volumes:
+      - corpus-cache:/app/data/corpus
+    entrypoint: ["python", "-m", "app.ingestion"]
+
+volumes:
+  postgres-data:
+  ollama-models:
+  corpus-cache:

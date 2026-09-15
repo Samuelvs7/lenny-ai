@@ -1,0 +1,345 @@
+/**
+ * Application shell: owns session state and coordinates the three panes.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ApiError, api } from "./api/client";
+import type {
+  Artifact,
+  HealthResponse,
+  KnowledgeBaseStats,
+  Message,
+  ModelsResponse,
+  SessionSummary,
+} from "./api/types";
+import { ArtifactViewer } from "./components/ArtifactViewer";
+import { Chat } from "./components/Chat";
+import { Sidebar } from "./components/Sidebar";
+import { StatusPanel } from "./components/StatusPanel";
+
+type Theme = "light" | "dark";
+
+export function App() {
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
+
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [models, setModels] = useState<ModelsResponse | null>(null);
+  const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBaseStats | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<Theme>(() => readStoredTheme());
+
+  /** The message text of the last send, so "Try again" can replay it. */
+  const lastSent = useRef<string | null>(null);
+
+  // --- theme ---------------------------------------------------------------
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem("lenny-theme", theme);
+    } catch {
+      // Private mode / blocked storage: theme simply does not persist.
+    }
+  }, [theme]);
+
+  // --- bootstrap -----------------------------------------------------------
+
+  const refreshStatus = useCallback(async () => {
+    const [healthResult, modelsResult, kbResult] = await Promise.allSettled([
+      api.health(),
+      api.models(),
+      api.knowledgeBase(),
+    ]);
+    if (healthResult.status === "fulfilled") setHealth(healthResult.value);
+    if (modelsResult.status === "fulfilled") setModels(modelsResult.value);
+    if (kbResult.status === "fulfilled") setKnowledgeBase(kbResult.value);
+  }, []);
+
+  const refreshSessions = useCallback(async () => {
+    try {
+      setSessions(await api.listSessions());
+    } catch (err) {
+      if (err instanceof ApiError) setError(err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshSessions();
+    void refreshStatus();
+  }, [refreshSessions, refreshStatus]);
+
+  // --- session actions -----------------------------------------------------
+
+  const openSession = useCallback(async (id: string) => {
+    setError(null);
+    setSidebarOpen(false);
+    try {
+      const detail = await api.getSession(id);
+      setActiveId(detail.id);
+      setMessages(detail.messages);
+      setArtifacts(detail.artifacts);
+      setActiveArtifactId(detail.artifacts[0]?.id ?? null);
+    } catch (err) {
+      if (err instanceof ApiError) setError(err);
+    }
+  }, []);
+
+  const newChat = useCallback(async () => {
+    setError(null);
+    setSidebarOpen(false);
+    try {
+      const session = await api.createSession();
+      setActiveId(session.id);
+      setMessages([]);
+      setArtifacts([]);
+      setActiveArtifactId(null);
+      setDraft("");
+      await refreshSessions();
+      return session.id;
+    } catch (err) {
+      if (err instanceof ApiError) setError(err);
+      return null;
+    }
+  }, [refreshSessions]);
+
+  const deleteSession = useCallback(
+    async (id: string) => {
+      try {
+        await api.deleteSession(id);
+        if (id === activeId) {
+          setActiveId(null);
+          setMessages([]);
+          setArtifacts([]);
+          setActiveArtifactId(null);
+        }
+        await refreshSessions();
+      } catch (err) {
+        if (err instanceof ApiError) setError(err);
+      }
+    },
+    [activeId, refreshSessions],
+  );
+
+  // --- sending -------------------------------------------------------------
+
+  const send = useCallback(
+    async (override?: string) => {
+      const text = (override ?? draft).trim();
+      if (!text || busy) return;
+
+      // Starting from the empty state creates the session lazily, so a user
+      // who never sends a message does not leave an empty conversation behind.
+      let sessionId = activeId;
+      if (!sessionId) {
+        sessionId = await newChat();
+        if (!sessionId) return;
+      }
+
+      setError(null);
+      setBusy(true);
+      setDraft("");
+      lastSent.current = text;
+
+      // Optimistic echo: the question appears instantly, which matters a lot
+      // when the model may take 30+ seconds to answer.
+      const optimistic: Message = {
+        id: `pending-${Date.now()}`,
+        role: "user",
+        content: text,
+        skill: null,
+        router_reason: null,
+        model_provider: null,
+        model_name: null,
+        latency_ms: null,
+        citations: [],
+        metadata: {},
+        created_at: new Date().toISOString(),
+      };
+      setMessages((current) => [...current, optimistic]);
+
+      try {
+        const response = await api.chat(sessionId, text);
+        setMessages((current) => [
+          ...current.filter((message) => message.id !== optimistic.id),
+          response.user_message,
+          response.assistant_message,
+        ]);
+
+        if (response.artifact) {
+          setArtifacts((current) => [response.artifact!, ...current]);
+          setActiveArtifactId(response.artifact.id);
+        }
+        void refreshSessions();
+      } catch (err) {
+        // Roll the optimistic message back so the transcript never shows a
+        // question that was never actually recorded.
+        setMessages((current) => current.filter((message) => message.id !== optimistic.id));
+        setDraft(text);
+        if (err instanceof ApiError) setError(err);
+        void refreshStatus();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [activeId, busy, draft, newChat, refreshSessions, refreshStatus],
+  );
+
+  const retry = useCallback(() => {
+    if (lastSent.current) void send(lastSent.current);
+  }, [send]);
+
+  const regenerate = useCallback(
+    (artifact: Artifact) => {
+      void send(
+        `Regenerate the ${artifact.kind === "html" ? "HTML page" : "Markdown document"} "${artifact.title}" with the same grounding, improving clarity and structure.`,
+      );
+    },
+    [send],
+  );
+
+  // --- derived -------------------------------------------------------------
+
+  const activeArtifact = useMemo(
+    () => artifacts.find((artifact) => artifact.id === activeArtifactId) ?? null,
+    [artifacts, activeArtifactId],
+  );
+
+  const artifactMessageIds = useMemo(
+    () =>
+      new Set(
+        artifacts
+          .map((artifact) => artifact.message_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    [artifacts],
+  );
+
+  const openArtifactForMessage = useCallback(
+    (messageId: string) => {
+      const match = artifacts.find((artifact) => artifact.message_id === messageId);
+      if (match) setActiveArtifactId(match.id);
+    },
+    [artifacts],
+  );
+
+  const activeTitle =
+    sessions.find((session) => session.id === activeId)?.title ?? "New chat";
+
+  return (
+    <div
+      className="app"
+      data-artifact-open={activeArtifact ? "true" : "false"}
+      data-sidebar-open={sidebarOpen ? "true" : "false"}
+    >
+      <Sidebar
+        sessions={sessions}
+        activeId={activeId}
+        loading={loadingSessions}
+        busy={busy}
+        health={health}
+        models={models}
+        onNewChat={() => void newChat()}
+        onSelect={(id) => void openSession(id)}
+        onDelete={(id) => void deleteSession(id)}
+        onOpenStatus={() => {
+          void refreshStatus();
+          setStatusOpen(true);
+        }}
+      />
+
+      {sidebarOpen && (
+        <button
+          className="scrim"
+          aria-label="Close navigation"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <div className="workspace">
+        <header className="topbar">
+          <button
+            className="icon-btn topbar__menu"
+            onClick={() => setSidebarOpen((open) => !open)}
+            aria-label="Toggle conversations"
+          >
+            ☰
+          </button>
+          <div className="topbar__title">{activeTitle}</div>
+          <div className="topbar__actions">
+            <button
+              className="icon-btn"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            >
+              {theme === "dark" ? "☀" : "☾"}
+            </button>
+            {activeArtifact && (
+              <button
+                className="icon-btn"
+                aria-pressed="true"
+                onClick={() => setActiveArtifactId(null)}
+                aria-label="Hide artifact panel"
+              >
+                ▥
+              </button>
+            )}
+          </div>
+        </header>
+
+        <Chat
+          messages={messages}
+          busy={busy}
+          error={error}
+          draft={draft}
+          onDraftChange={setDraft}
+          onSend={(text) => void send(text)}
+          onRetry={retry}
+          onOpenArtifact={openArtifactForMessage}
+          artifactMessageIds={artifactMessageIds}
+        />
+      </div>
+
+      <ArtifactViewer
+        artifact={activeArtifact}
+        artifacts={artifacts}
+        onSelect={(artifact) => setActiveArtifactId(artifact.id)}
+        onClose={() => setActiveArtifactId(null)}
+        onRegenerate={regenerate}
+        busy={busy}
+      />
+
+      {statusOpen && (
+        <StatusPanel
+          health={health}
+          models={models}
+          knowledgeBase={knowledgeBase}
+          onClose={() => setStatusOpen(false)}
+          onRefresh={() => void refreshStatus()}
+        />
+      )}
+    </div>
+  );
+}
+
+function readStoredTheme(): Theme {
+  try {
+    const stored = localStorage.getItem("lenny-theme");
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // Storage unavailable — fall through to the system preference.
+  }
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
