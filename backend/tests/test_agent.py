@@ -367,3 +367,54 @@ class TestFollowUpQueryRewriting:
         rewritten = build_retrieval_query("What about for startups?", history)
         assert "pricing" in rewritten
         assert "hiring" not in rewritten
+
+    def _turn(self, role, content, declined=False):
+        from datetime import datetime, timezone
+        from uuid import uuid4
+
+        return Message(
+            id=uuid4(),
+            session_id=uuid4(),
+            role=role,
+            content=content,
+            metadata={"declined": declined} if role is MessageRole.ASSISTANT else {},
+            created_at=datetime.now(timezone.utc),
+        )
+
+    def test_skips_a_declined_turn_when_choosing_the_topic(self):
+        """REGRESSION: a refused question is not a topic.
+
+        Observed live — the session went PMF (answered) -> sourdough (declined)
+        -> "What about for B2B?". The rewrite spliced in the *sourdough* terms,
+        dropping similarity from 0.70 to 0.49 and causing a spurious refusal.
+        """
+        history = [
+            self._turn(MessageRole.USER, "What did guests say about finding product-market fit?"),
+            self._turn(MessageRole.ASSISTANT, "Guests said...", declined=False),
+            self._turn(MessageRole.USER, "What is the best recipe for sourdough bread?"),
+            self._turn(MessageRole.ASSISTANT, "I don't have enough...", declined=True),
+        ]
+
+        rewritten = build_retrieval_query("What about for B2B specifically?", history)
+
+        assert "product-market" in rewritten
+        assert "sourdough" not in rewritten
+        assert "bread" not in rewritten
+
+    def test_drops_conversational_scaffolding_from_the_topic(self):
+        """'guests say' carries no topic and dilutes the dense query."""
+        history = [
+            self._turn(MessageRole.USER, "What did guests say about finding product-market fit?"),
+            self._turn(MessageRole.ASSISTANT, "Answer", declined=False),
+        ]
+        rewritten = build_retrieval_query("What about for B2B?", history)
+        assert "guests" not in rewritten.lower()
+        assert "say" not in rewritten.lower().split()
+        assert "product-market" in rewritten
+
+    def test_falls_back_when_every_prior_turn_was_declined(self):
+        history = [
+            self._turn(MessageRole.USER, "Something the archive does not cover"),
+            self._turn(MessageRole.ASSISTANT, "I don't have enough...", declined=True),
+        ]
+        assert build_retrieval_query("What about for B2B?", history) == "What about for B2B?"

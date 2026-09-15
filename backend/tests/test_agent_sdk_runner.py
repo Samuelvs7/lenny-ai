@@ -66,7 +66,10 @@ def _grounded() -> RetrievalResult:
 
 def _configured() -> Settings:
     return Settings(
-        anthropic_api_key="sk-ant-test-not-a-real-key",
+        # Deliberately NOT shaped like a real key: the guard only checks that
+        # the value is non-empty, and an "sk-ant-" prefix here would trip
+        # secret scanners on a public repository.
+        anthropic_api_key="fixture-not-a-real-credential",
         anthropic_model="claude-opus-5",
         agent_runner="claude_agent_sdk",
         app_env="test",

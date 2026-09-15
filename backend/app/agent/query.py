@@ -52,7 +52,12 @@ _DANGLING_REFERENCE = re.compile(
 #: Words that carry no topical signal when we splice two questions together.
 _NOISE = re.compile(
     r"^(what|how|why|when|who|which|where|about|for|the|a|an|is|are|do|does|did|"
-    r"can|could|should|would|specifically|exactly|instead|more|else)$",
+    r"can|could|should|would|specifically|exactly|instead|more|else|with|"
+    # Conversational scaffolding that carries no topic. Without these, a rewrite
+    # of "What did guests say about X?" splices in "guests say", which adds
+    # nothing to retrieval and dilutes the embedding.
+    r"guest|guests|say|says|said|tell|talk|talks|discuss|mention|mentioned|"
+    r"episode|episodes|podcast|lenny)$",
     re.IGNORECASE,
 )
 
@@ -93,24 +98,48 @@ def _topic_terms(text: str, limit: int = 12) -> list[str]:
     return terms
 
 
+def _last_grounded_question(history: list[Message]) -> str | None:
+    """The most recent user question that actually produced a grounded answer.
+
+    **Not simply the most recent user message.** A question the assistant
+    *declined* established no topic, so splicing it into a follow-up actively
+    poisons retrieval. Observed live: a session went
+
+        1. "What did guests say about finding product-market fit?"  -> answered
+        2. "What is the best recipe for sourdough bread?"           -> DECLINED
+        3. "What about for B2B specifically?"                       -> follow-up
+
+    and step 3 was rewritten using the *sourdough* terms, dropping similarity
+    from 0.70 to 0.49 and causing a spurious refusal. Walking back past
+    declined turns is what makes the refusal signal useful rather than harmful.
+    """
+    declined_questions: set[str] = set()
+    for index, message in enumerate(history):
+        if message.role is not MessageRole.USER:
+            continue
+        reply = next(
+            (m for m in history[index + 1 :] if m.role is MessageRole.ASSISTANT), None
+        )
+        if reply is not None and reply.metadata.get("declined"):
+            declined_questions.add(message.content)
+
+    for message in reversed(history):
+        if message.role is MessageRole.USER and message.content not in declined_questions:
+            return message.content
+    return None
+
+
 def build_retrieval_query(question: str, history: list[Message]) -> str:
     """The text to search the corpus with.
 
     Returns ``question`` unchanged for self-contained messages. For follow-ups,
-    returns the previous user question's topic terms followed by the new
+    returns the previous grounded question's topic terms followed by the new
     message, so retrieval sees both the subject and the qualifier.
     """
     if not history or not is_follow_up(question):
         return question
 
-    previous = next(
-        (
-            message.content
-            for message in reversed(history)
-            if message.role is MessageRole.USER
-        ),
-        None,
-    )
+    previous = _last_grounded_question(history)
     if not previous:
         return question
 

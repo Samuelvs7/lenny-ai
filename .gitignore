@@ -4,6 +4,22 @@
 !.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+secrets.json
+credentials.json
+service-account*.json
+.netrc
+.npmrc
+*.crt
+
+# Database dumps can contain conversation content; keep them out of the repo.
+*.dump
+*.sql.gz
 
 # --- Python ---
 __pycache__/
