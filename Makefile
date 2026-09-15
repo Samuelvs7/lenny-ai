@@ -12,6 +12,9 @@ help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
+preflight:  ## Check prerequisites and report what is missing
+	python scripts/preflight.py
+
 # --- Docker ----------------------------------------------------------------
 
 up:  ## Start the full stack (postgres, ollama, api, web)

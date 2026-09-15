@@ -55,6 +55,13 @@ Open **http://localhost:8080**.
 Verify everything is healthy:
 
 ```bash
+python scripts/preflight.py
+```
+
+It checks every prerequisite and prints the exact command to fix anything
+missing. For live component status once the API is up:
+
+```bash
 curl -s http://localhost:8000/health/deep | python -m json.tool
 ```
 
@@ -63,6 +70,12 @@ curl -s http://localhost:8000/health/deep | python -m json.tool
 ## Quick start (no Docker)
 
 Prerequisites: Python 3.11+, Node 20+, PostgreSQL 14+, [Ollama](https://ollama.com).
+
+Check your machine first — this reports exactly what is missing and how to fix it:
+
+```bash
+python scripts/preflight.py
+```
 
 ```bash
 # 1. Models
