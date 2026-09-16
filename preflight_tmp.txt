@@ -1,0 +1,23 @@
+﻿
+The Lenny Growth Assistant - preflight
+==============================================
+[  OK  ] Python 3.11
+[  OK  ] Node.js v24.14.1
+[  OK  ] .env present
+[  OK  ] .env is not tracked by git
+[ FAIL ] PostgreSQL not reachable at localhost:5432
+         Start it:  docker compose up -d postgres
+         or start your local PostgreSQL service.
+[ FAIL ] Ollama not reachable at http://localhost:11434
+         Start it:  ollama serve      (or: docker compose up -d ollama)
+[ WARN ] ANTHROPIC_API_KEY not set
+         Optional. The app runs fully local on Ollama without it.
+[ WARN ] API not running
+         Start it, then re-run this check to see knowledge-base status.
+
+==============================================
+2 blocking issue(s):
+  - PostgreSQL not reachable at localhost:5432
+  - Ollama not reachable at http://localhost:11434
+
+Fix the above, then re-run:  python scripts/preflight.py

@@ -166,7 +166,7 @@ export function App() {
    */
   const shareConversation = useCallback(async () => {
     const lines = messages.map((m) => {
-      const who = m.role === "user" ? "**You**" : "**Lenny-AI**";
+      const who = m.role === "user" ? "**You**" : "**Lenny Growth Assistant**";
       const cites = (m.citations ?? [])
         .map((c) => `- [${c.marker}] ${c.guest ?? "Unknown"} — ${c.title}${c.deep_link ? ` (${c.deep_link})` : ""}`)
         .join("\n");

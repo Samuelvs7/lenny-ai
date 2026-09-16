@@ -76,7 +76,7 @@ export function Sidebar({
       <div className="sidebar__brand">
         <BrandMark />
         <div className="sidebar__brandtext">
-          <div className="sidebar__title">Lenny-AI</div>
+          <div className="sidebar__title">Lenny Growth Assistant</div>
           <div className="sidebar__tagline">Insights from Lenny's Podcast</div>
         </div>
       </div>
